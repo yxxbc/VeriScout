@@ -215,6 +215,13 @@ jobs:
           ves "一次性纸杯到底能不能回收"
           ```
 
+          默认那一轮只在终端把结论说清楚（Markdown 渲染），不写任何文件；
+          要一份可以离线打开的证据报告就加 `--html`（或配置 `viz.auto_html: true`）：
+
+          ```bash
+          ves --html "一次性纸杯到底能不能回收"     # → visualizations/<名字>.html
+          ```
+
           完整变更见 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)。
           EOF
           sed -i "s/__TAG__/${tag}/g" NOTES.md
