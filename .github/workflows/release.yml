@@ -108,16 +108,27 @@ jobs:
           cp README.md LICENSE CHANGELOG.md "dist/${name}/"
 
           if [ "${RUNNER_OS}" = "Windows" ]; then
+            archive="dist/${name}.zip"
+            want="${name}/ves.exe"
             (cd dist && 7z a -tzip "${name}.zip" "${name}" > /dev/null)
-            # the zip must have the package folder at its root (install.ps1 expects that)
-            7z l -ba "dist/${name}.zip" | awk '{print $NF}' | grep -qx "${name}/ves.exe" \
-              || { echo "::error::${name}.zip has an unexpected layout"; 7z l "dist/${name}.zip"; exit 1; }
+            7z l -ba "$archive" | awk '{print $NF}' | tr -d '\r' > "$RUNNER_TEMP/listing.txt"
           else
-            tar -czf "dist/${name}.tar.gz" -C dist "${name}"
-            tar -tzf "dist/${name}.tar.gz" | grep -qx "${name}/ves" \
-              || { echo "::error::${name}.tar.gz has an unexpected layout"; tar -tzf "dist/${name}.tar.gz"; exit 1; }
+            archive="dist/${name}.tar.gz"
+            want="${name}/ves"
+            tar -czf "$archive" -C dist "${name}"
+            tar -tzf "$archive" > "$RUNNER_TEMP/listing.txt"
           fi
           rm -rf "dist/${name}"
+
+          # The archive root has to be the package folder: install.sh and install.ps1
+          # look for <name>/ves(.exe) there. Listing goes to a file first because
+          # `tar | grep -q` dies of SIGPIPE when the step runs under `pipefail`.
+          if ! grep -qx "$want" "$RUNNER_TEMP/listing.txt"; then
+            echo "::error::$archive does not contain $want"
+            cat "$RUNNER_TEMP/listing.txt"
+            exit 1
+          fi
+          echo "✓ $(wc -l < "$RUNNER_TEMP/listing.txt") entries, binary at $want"
           ls -lh dist
 
       - uses: actions/upload-artifact@v5
