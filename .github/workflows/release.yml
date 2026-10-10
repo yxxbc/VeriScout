@@ -81,13 +81,16 @@ jobs:
           if [ "${RUNNER_OS}" = "Windows" ]; then bin="${bin}.exe"; fi
           "$bin" --version
           "$bin" tools --json > /dev/null
+          # musl artifacts must not carry a dynamic loader (they have to run on Alpine,
+          # where there is no glibc). Rust emits a static-PIE, hence both spellings.
           if [ "${{ contains(matrix.target, 'musl') }}" = "true" ]; then
-            if ! file "$bin" | grep -q 'statically linked'; then
-              echo "::error::$bin is not statically linked"
-              file "$bin"
-              exit 1
-            fi
-            file "$bin"
+            desc=$(file "$bin")
+            echo "$desc"
+            case "$desc" in
+              *"dynamically linked"*) echo "::error::$bin is dynamically linked"; exit 1 ;;
+              *"statically linked"*|*"static-pie linked"*) echo "✓ static musl build" ;;
+              *) echo "::error::cannot tell whether $bin is static"; exit 1 ;;
+            esac
           fi
 
       - name: package
