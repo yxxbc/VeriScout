@@ -143,7 +143,10 @@ mod tests {
     #[test]
     fn runaway_process_is_killed() {
         let mut cmd = Command::new("/bin/sh");
-        cmd.arg("-c").arg("sleep 30");
+        // `exec` keeps the child *as* the sleep process: if the shell forked it
+        // instead, the grandchild would hold the pipes open and the reader threads
+        // would wait for it (30s) — CI caught exactly that.
+        cmd.arg("-c").arg("exec sleep 30");
         let out = run(&mut cmd, &RunOptions::new(Duration::from_millis(400))).unwrap();
         assert!(out.timed_out, "process should have been killed");
         assert!(out.duration_ms < 5_000);

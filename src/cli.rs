@@ -843,7 +843,11 @@ mod tests {
 
     #[test]
     fn report_block_is_a_clickable_pointer_to_the_artifact() {
-        let cfg = Config::default();
+        let mut cfg = Config::default();
+        // Keep the test hermetic: an inline key means it does not depend on an env
+        // var or a credential file being present on the machine running it.
+        cfg.llm.api_key = "sk-test".into();
+        cfg.llm.credential_files.clear();
         let agent = Agent::new(cfg, false, false).unwrap();
         let finalized = html_tools::FinalizedReport {
             name: "demo-report".into(),
