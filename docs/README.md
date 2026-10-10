@@ -2,7 +2,7 @@
 
 # 文档索引
 
-> 版本 `ves 0.1.0` · `cargo test` 104 项全绿 · 新手建议先读 [README 的「三分钟上手」](../README.md#2-三分钟上手)
+> 版本 `ves 0.1.0` · `cargo test` 110 项全绿 · 新手建议先读 [README 的「三分钟上手」](../README.md#2-三分钟上手)
 
 VeriScout（`ves`）的文档按「先看结论，再看细节」的顺序组织：
 
@@ -18,10 +18,12 @@ VeriScout（`ves`）的文档按「先看结论，再看细节」的顺序组织
 ## 一分钟版本
 
 ```bash
-cargo build --release
-./target/release/ves "要核实的问题"        # 检索 → 抓原文 → 分级 → 出图 → 结论
-./target/release/ves repl                 # 交互模式
-./target/release/ves tools                # 看看它到底能做什么（只有 6 个）
+# 安装（macOS / Linux；Windows 见 README 的 install.ps1）
+curl -fsSL https://raw.githubusercontent.com/yxxbc/VeriScout/main/install.sh | sh
+
+ves "要核实的问题"        # 检索 → 抓原文 → 分级 → 出图 → 结论
+ves repl                 # 交互模式
+ves tools                # 看看它到底能做什么（只有 6 个）
 ```
 
 产物：`visualizations/<name>.html`（单文件离线报告）+ `<name>.json`（数据模型，可继续 edit_html）。

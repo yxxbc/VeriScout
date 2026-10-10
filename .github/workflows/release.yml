@@ -20,7 +20,7 @@ jobs:
     outputs:
       tag: ${{ steps.v.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: v
         shell: bash
         run: |
@@ -47,7 +47,7 @@ jobs:
           - { os: macos-14,         target: aarch64-apple-darwin }
           - { os: windows-2022,     target: x86_64-pc-windows-msvc }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -57,20 +57,17 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # Static musl builds: rustls pulls in ring (C code), so give the C compiler
-      # and the linker a musl wrapper for the target triple.
-      - name: musl toolchain
+      # Static musl builds: rustls pulls in ring (C code), so the C parts need a musl
+      # compiler. The *linker* stays rustc's own (self-contained crt + libc.a): also
+      # pointing it at musl-gcc duplicates the startup objects and the binary segfaults.
+      - name: musl C compiler
         if: contains(matrix.target, 'musl')
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y musl-tools
-          triple_upper=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
-          {
-            echo "CC_${{ matrix.target }}=musl-gcc"
-            echo "CARGO_TARGET_${triple_upper}_LINKER=musl-gcc"
-          } >> "$GITHUB_ENV"
+          echo "CC_${{ matrix.target }}=musl-gcc" >> "$GITHUB_ENV"
 
       - name: build
         shell: bash
@@ -84,6 +81,14 @@ jobs:
           if [ "${RUNNER_OS}" = "Windows" ]; then bin="${bin}.exe"; fi
           "$bin" --version
           "$bin" tools --json > /dev/null
+          if [ "${{ contains(matrix.target, 'musl') }}" = "true" ]; then
+            if ! file "$bin" | grep -q 'statically linked'; then
+              echo "::error::$bin is not statically linked"
+              file "$bin"
+              exit 1
+            fi
+            file "$bin"
+          fi
 
       - name: package
         shell: bash
@@ -107,7 +112,7 @@ jobs:
           rm -rf "dist/${name}"
           ls -lh dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ves-${{ matrix.target }}
           path: dist/*
@@ -118,9 +123,9 @@ jobs:
     needs: [meta, build]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: dist
           merge-multiple: true
