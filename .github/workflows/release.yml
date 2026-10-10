@@ -108,9 +108,14 @@ jobs:
           cp README.md LICENSE CHANGELOG.md "dist/${name}/"
 
           if [ "${RUNNER_OS}" = "Windows" ]; then
-            7z a -tzip "dist/${name}.zip" "dist/${name}" > /dev/null
+            (cd dist && 7z a -tzip "${name}.zip" "${name}" > /dev/null)
+            # the zip must have the package folder at its root (install.ps1 expects that)
+            7z l -ba "dist/${name}.zip" | awk '{print $NF}' | grep -qx "${name}/ves.exe" \
+              || { echo "::error::${name}.zip has an unexpected layout"; 7z l "dist/${name}.zip"; exit 1; }
           else
             tar -czf "dist/${name}.tar.gz" -C dist "${name}"
+            tar -tzf "dist/${name}.tar.gz" | grep -qx "${name}/ves" \
+              || { echo "::error::${name}.tar.gz has an unexpected layout"; tar -tzf "dist/${name}.tar.gz"; exit 1; }
           fi
           rm -rf "dist/${name}"
           ls -lh dist
