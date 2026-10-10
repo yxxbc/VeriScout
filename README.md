@@ -8,7 +8,7 @@
 
 <h1 align="center">VeriScout</h1>
 
-<p align="center"><b>给它一个问题，它自己上网查、核对来源，最后交给你一份可以离线打开的证据报告。</b></p>
+<p align="center"><b>给它一个问题，它自己上网查、核对来源，先把结论用大白话说清楚；要留档就加一个开关，得到一份可以离线打开的证据报告。</b></p>
 <p align="center"><code>ves</code> —— Rust 编写的网络查证小助手</p>
 
 <!-- 仓库地址指向 https://github.com/yxxbc/VeriScout；改地址时同步替换 Cargo.toml 的 repository 字段与本文件两处引用即可 -->
@@ -16,7 +16,7 @@
   <a href="https://github.com/yxxbc/VeriScout"><img alt="GitHub 仓库" src="https://img.shields.io/badge/GitHub-仓库-181717?logo=github&style=flat-square"></a>
   <a href="https://github.com/yxxbc/VeriScout/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/yxxbc/VeriScout/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/yxxbc/VeriScout/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/yxxbc/VeriScout?style=flat-square&label=release"></a>
-  <img alt="版本" src="https://img.shields.io/badge/version-0.1.0-e3e9f0?labelColor=0a0b0e&style=flat-square">
+  <img alt="版本" src="https://img.shields.io/badge/version-0.1.1-e3e9f0?labelColor=0a0b0e&style=flat-square">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-1.75%2B-dea584?logo=rust&style=flat-square">
   <img alt="许可证" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   <img alt="平台" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square">
@@ -106,11 +106,11 @@ irm https://raw.githubusercontent.com/yxxbc/VeriScout/main/install.ps1 | iex
 
 | 平台 | 文件 |
 | --- | --- |
-| Linux x86_64（静态，Alpine 可用） | `ves-v0.1.0-x86_64-unknown-linux-musl.tar.gz` |
-| Linux arm64（静态） | `ves-v0.1.0-aarch64-unknown-linux-musl.tar.gz` |
-| macOS Apple Silicon | `ves-v0.1.0-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `ves-v0.1.0-x86_64-apple-darwin.tar.gz` |
-| Windows x64 | `ves-v0.1.0-x86_64-pc-windows-msvc.zip` |
+| Linux x86_64（静态，Alpine 可用） | `ves-v0.1.1-x86_64-unknown-linux-musl.tar.gz` |
+| Linux arm64（静态） | `ves-v0.1.1-aarch64-unknown-linux-musl.tar.gz` |
+| macOS Apple Silicon | `ves-v0.1.1-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `ves-v0.1.1-x86_64-apple-darwin.tar.gz` |
+| Windows x64 | `ves-v0.1.1-x86_64-pc-windows-msvc.zip` |
 
 每个包里有可执行文件 + `README.md` + `LICENSE` + `CHANGELOG.md`；校验：`sha256sum -c SHA256SUMS.txt`。
 
@@ -204,7 +204,8 @@ ves> /exit
 
 | 我想…… | 命令 | 说明 |
 | --- | --- | --- |
-| 研究一个问题 | `ves "你的问题"` | 完整流程，最后产出报告 |
+| 研究一个问题 | `ves "你的问题"` | 完整流程，**默认在终端给结论**，不写任何文件 |
+| 顺便留一份报告 | `ves --html "你的问题"` | 额外产出离线 HTML 报告到 `visualizations/` |
 | 只搜一下（不花模型钱） | `ves search "关键词" --limit 5` | 直接看检索结果，不经过大模型 |
 | 搜新闻 / 学术 / 代码 | `ves search "关键词" --scope news` | scope：`web` / `news` / `academic` / `code` / `qa` / `all` |
 | 深挖：连原文一起抓 | `ves search "关键词" --deep` | 顺带打开前几个结果页 |
@@ -212,17 +213,19 @@ ves> /exit
 | 看网页的响应头 | `ves fetch https://example.com --headers` | 排障时有用 |
 | 渲染 JS 重的页面 | `ves fetch https://spa.example.com --render` | 走本地 AnySearch 渲染兜底 |
 | 跑一小段 Python | `ves script --code 'print("hi")'` | 在**网络只读沙箱**里执行 |
-| 看它有哪些工具 | `ves tools` | 只有 6 个，这就是全部能力 |
+| 看它有哪些工具 | `ves tools` | 默认 3 个；加 `--html` 变 6 个，这就是全部能力 |
 | 直接调用某个工具 | `ves call web_search --args '{"query":"rust"}'` | 脚本化 / 排障 |
 | 列出已生成的报告 | `ves viz list` | 也可以 `ves viz open <名字>` 直接打开 |
 | 检查配置与密钥 | `ves config show` | 密钥自动打码 |
 | 看版本 | `ves --version` | 当前：`ves 0.1.0` |
 
-任何命令都可以加 `--json` 输出机器可读结果（适合写脚本）；加 `-v` 打印完整结论与工具轨迹；加 `-q` 只输出报告链接。
+任何命令都可以加 `--json` 输出机器可读结果（适合写脚本）；加 `-v` 打印完整结论与工具轨迹；加 `-q` 只输出结论（报告模式下则是报告链接）。
 
 ---
 
 ## 4. 报告长什么样
+
+> 报告是**可选动作**：默认只在终端给结论，加 `--html`（或配置 `viz.auto_html=true`）才生成下面这份文件。
 
 一份报告 = 一个 HTML 文件，按「先结论、再证据、后审计」排成六节：
 
@@ -256,19 +259,30 @@ ves> /exit
 
 **Q2：它会不会乱动我的电脑？**
 
-不会，这是第一设计原则：**能力即边界**。它的工具面被硬性收窄成 6 个专用工具，二进制里**没有 shell、没有文件编辑器、没有通用执行器**——就算被网页里的恶意文字诱导，也无手可用。详见[第 6 节](#6-安全说明通俗版)。
+不会，这是第一设计原则：**能力即边界**。它的工具面被硬性收窄成少数几个专用工具（默认只有 3 个检索/核实工具），二进制里**没有 shell、没有文件编辑器、没有通用执行器**——就算被网页里的恶意文字诱导，也无手可用。详见[第 6 节](#6-安全说明通俗版)。
 
-**Q3：为什么这条说法被标成「未核实」？**
+**Q3：为什么默认不生成 HTML 报告了？**
+
+从 0.1.1 起，默认那一轮只在终端把结论说清楚（Markdown 渲染：标题、要点、链接都在），**不往磁盘写任何东西**——留不留档由你决定。要报告加一个开关即可：
+
+```bash
+ves --html "你的问题"        # 这一轮要报告
+ves --no-html "你的问题"      # 配置里开了报告，这一轮又不要
+```
+
+想以后每次都要，就在配置里写 `"viz": { "auto_html": true }`；开会话时也可以用 `/html on` 随时切换。报告模式下工具面会从 3 个变回 6 个（多出报告工具），终端最后只给一行可点击的报告位置。
+
+**Q4：为什么这条说法被标成「未核实」？**
 
 报告里的状态只代表**证据强度**：找不到可靠来源 ≠ 事情是假的。常见原因是来源质量差、互相矛盾，或这次没抓到一手材料。第 02 节的「状态怎么看」图例把五个状态各解释了一遍；点开来源自己判断即可。
 
-**Q3b：报告里为什么没有模型的原话？**
+**Q4b：报告里为什么没有模型的原话？**
 
 原话是运行结束时自动写入的（还会把模型在报告里写的旧版结论保留成备注）。如果你看到的是「这份报告里没有模型的原话」提示，说明它由旧版本生成——重新运行一次即可；也可以 `ves call edit_html --args '{"name":"报告名","set_conclusion":"…"}'` 手动补上。
 
-**Q4：报告存在哪？怎么删？**
+**Q5：报告存在哪？怎么删？**
 
-默认在当前目录的 `visualizations/`（一个 HTML + 一个同名 JSON 数据文件）。删除用：
+默认在当前目录的 `visualizations/`（一个 HTML + 一个同名 JSON 数据文件）；默认那轮不生成报告，加 `--html` 或 `viz.auto_html=true` 才有。删除用：
 
 ```bash
 ves call delete_html --args '{"name":"报告名"}'
@@ -276,7 +290,7 @@ ves call delete_html --args '{"name":"报告名"}'
 
 直接删文件也可以，只是记得把配套 JSON 一起删掉。
 
-**Q5：想换成别的模型 / 本地 Ollama？**
+**Q6：想换成别的模型 / 本地 Ollama？**
 
 编辑 `./.ves/config.json`：
 
@@ -294,7 +308,7 @@ ves call delete_html --args '{"name":"报告名"}'
 
 换成 OpenAI 同理：`base_url` 用 `https://api.openai.com/v1`、`api_key_env` 用 `OPENAI_API_KEY`。
 
-**Q6：我想让它用英文写报告？**
+**Q7：我想让它用英文写报告？**
 
 ```jsonc
 { "agent": { "language": "en", "style": "plain" } }
@@ -302,19 +316,19 @@ ves call delete_html --args '{"name":"报告名"}'
 
 `language` 控制输出语言，`style` 控制表达风格（默认 `plain`：短句、术语先解释、结论先行）。
 
-**Q7：某些网站抓不到 / 老是失败？**
+**Q8：某些网站抓不到 / 老是失败？**
 
 先看终端里的错误信息（它会如实说明是超时、被拒还是被安全策略拦截）。内置重试与退避（`net.retries`）；JS 很重的站点用 `--render` 走本地 AnySearch 渲染兜底。被黑名单误伤的域名可以在配置里加白名单。
 
-**Q8：一次研究要多久、花多少钱？**
+**Q9：一次研究要多久、花多少钱？**
 
 1–3 分钟、几十次模型调用；DeepSeek 上通常是几毛钱级别。想省钱：`--max-steps 8` 限制步数，或先用 `ves search` 摸清材料再研究。
 
-**Q9：「MCP」是什么？我该关心吗？**
+**Q10：「MCP」是什么？我该关心吗？**
 
 只用命令行可以不关心。如果你在用 Claude Desktop、Cursor 这类工具，可以把它挂上去（[第 7 节](#7-让其他-ai-工具调用它)），让那些 AI 获得「上网查证 + 出报告」的能力。
 
-**Q10：怎么升级？**
+**Q11：怎么升级？**
 
 ```bash
 # 一行脚本装的：再跑一遍即可（会自动覆盖旧版本）
@@ -324,11 +338,11 @@ curl -fsSL https://raw.githubusercontent.com/yxxbc/VeriScout/main/install.sh | s
 cd VeriScout && git pull && cargo build --release && cargo install --path .
 ```
 
-**Q11：能在脚本 / 其他程序里调用吗？**
+**Q12：能在脚本 / 其他程序里调用吗？**
 
 能。所有命令支持 `--json` 输出；`ves call <tool> --args '{...}'` 可以完全绕过模型直接调工具。
 
-**Q12：常见报错怎么读？**
+**Q13：常见报错怎么读？**
 
 | 现象 | 含义与处理 |
 | --- | --- |
@@ -343,16 +357,18 @@ cd VeriScout && git pull && cargo build --release && cargo install --path .
 
 > 一句话：**它只能「上网看」，不能「动手改」**。完整威胁模型与已知局限见 [docs/安全模型.md](docs/安全模型.md)。
 
-### 它总共只会这 6 件事
+### 它总共只会这 6 件事（默认只用前 3 件）
 
 | 工具 | 作用 | 关键约束 |
 | --- | --- | --- |
 | `web_search` | 多引擎聚合检索 | 域名黑名单过滤；结果带可信度先验与跨引擎票数 |
 | `curl_tool` | 抓取单个网页并转成可读文本 | 仅 http/https；禁内网 / 回环地址；响应体积封顶；不做写盘（除非显式 `save=true`） |
 | `scripts_tool` | 沙箱里跑 Python（正则、JSON、统计） | AST 白名单 + 受限 builtins + 网络只读；禁文件 / 进程 / 动态执行 |
-| `create_html` | 生成报告 | 只写 `visualizations/`；拒绝非 http(s) 来源链接 |
-| `edit_html` | 修改报告 | 改 JSON 模型再整体重渲染，HTML 与数据不会漂移 |
-| `delete_html` | 删除报告 | 路径经 slug 校验，无法越出报告目录 |
+| `create_html` | 生成报告 | **默认不提供**（`--html` 或 `viz.auto_html=true` 才开放）；只写 `visualizations/`；拒绝非 http(s) 来源链接 |
+| `edit_html` | 修改报告 | 同上，只在报告模式下提供；改 JSON 模型再整体重渲染，HTML 与数据不会漂移 |
+| `delete_html` | 删除报告 | 同上；路径经 slug 校验，无法越出报告目录 |
+
+> 表格是**注册表**（二进制里就这 6 个）。默认那一轮只把前 3 个交给模型 —— 工具面即能力，报告工具连 schema 都不发，所以默认运行不会、也不能凭空产生文件。越界调用会被直接拒绝（`tool 'create_html' is not available in this run`）。
 
 ### 它**没有**的能力
 
@@ -371,7 +387,7 @@ cd VeriScout && git pull && cargo build --release && cargo install --path .
 
 ## 7. 让其他 AI 工具调用它
 
-`ves mcp` 启动一个标准 **MCP（Model Context Protocol）stdio 服务**：把「跑完整研究」和 6 个底层工具暴露给别的 agent（Claude Desktop、Cursor、各类 agent 框架）。
+`ves mcp` 启动一个标准 **MCP（Model Context Protocol）stdio 服务**：把「跑完整研究」和 6 个底层工具暴露给别的 agent（Claude Desktop、Cursor、各类 agent 框架）。MCP 侧的工具是**显式**调用，所以一直给全 6 个；受 `viz.auto_html` 影响的是其中的 `research`（它跑的是同一个 agent 循环）。
 
 ```jsonc
 // MCP 客户端配置示例（Claude Desktop / Cursor 等）
@@ -395,7 +411,7 @@ cd VeriScout && git pull && cargo build --release && cargo install --path .
 
 ```bash
 cargo build --release          # 常规构建
-cargo test                     # 110 项单元测试（封闭工具面 / 离线自包含 / 提示词契约 / MCP 协议）
+cargo test                     # 120 项单元测试（封闭工具面 / 离线自包含 / 提示词契约 / Markdown 渲染 / MCP 协议）
 ```
 
 ### 发布与安装脚本
@@ -432,8 +448,9 @@ src/
   http.rs        加固 HTTP 层（协议/黑名单/私网/体积/编码）
   blacklist.rs   域名规则与可信度先验
   search/        多引擎检索（providers/*）
-  tools/         6 个工具（html_tools 负责报告生成与重渲染）
+  tools/         注册表 6 个工具（默认只把前 3 个交给模型；html_tools 负责报告生成与重渲染）
   html/          报告数据模型 + 渲染器（HTML 只是 JSON 模型的投影）
+  md.rs          终端 Markdown 渲染（termimad 皮肤策略：彩色 / 纯文本 + 宽度）
   mcp.rs         MCP stdio 服务
   proc.rs        子进程封装（固定 argv、无 shell、硬超时）
   util.rs        文本 / 日期 / URL 归一化
@@ -446,7 +463,8 @@ docs/            计划书 / 架构设计 / 工具参考 / 安全模型 / 配置
 
 ### 品质护栏
 
-- **封闭工具面**有测试兜底：断言注册表恰好 6 个工具，`bash/edit/write` 不可能出现；
+- **封闭工具面**有测试兜底：断言注册表恰好 6 个工具、默认只暴露 3 个，`bash/edit/write` 不可能出现；
+- **默认不落盘**有测试兜底：断言默认配置的工具面只有 3 个、`create_html` 不在其中，越界调用被拒；
 - **离线报告**有测试兜底：输出不含外链资源、含内联 favicon 与版本号、无占位符残留；
 - **提示词契约**有测试兜底：断言包含「逐条自查 / 不迎合 / 说人话」条款；
 - **MCP 协议**有测试兜底：协议版本回显、`tools/list`、错误以 `isError` 返回、未知方法 `-32601`。
@@ -501,7 +519,7 @@ docs/            计划书 / 架构设计 / 工具参考 / 安全模型 / 配置
 | [docs/README.md](docs/README.md) | 所有人 | 文档导航（先看哪一篇） |
 | [docs/计划书.md](docs/计划书.md) | 决策者 / 评审 | 背景、目标、需求、设计决策、里程碑、风险、验收标准 |
 | [docs/架构设计.md](docs/架构设计.md) | 开发者 | 模块职责、运行时结构、时序、关键类型、扩展点、测试策略 |
-| [docs/工具参考.md](docs/工具参考.md) | 使用者 / 集成方 | 6 个工具的完整参数表、返回值、示例、错误情形 |
+| [docs/工具参考.md](docs/工具参考.md) | 使用者 / 集成方 | 工具的完整参数表、返回值、示例、错误情形（含默认只开放哪几个） |
 | [docs/安全模型.md](docs/安全模型.md) | 安全评审 | 威胁模型、逐层防护、能力清单、已知局限 |
 | [docs/配置参考.md](docs/配置参考.md) | 运维 / 高级用户 | 全部配置字段、示例文件、环境变量、FAQ |
 

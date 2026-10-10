@@ -256,10 +256,25 @@ pub fn dispatch(ctx: &mut Ctx, name: &str, args: &Value) -> Result<Value> {
     (spec.handler)(ctx, args)
 }
 
-/// OpenAI / DeepSeek compatible tool declaration payload.
-pub fn openai_tools() -> Value {
-    let all: Vec<&str> = registry().iter().map(|t| t.name).collect();
-    openai_tools_for(&all)
+/// The three tools that only exist to produce the HTML report.
+pub const REPORT_TOOLS: [&str; 3] = ["create_html", "edit_html", "delete_html"];
+
+/// The tool names offered to the model for this config. Without `viz.auto_html` the
+/// three report tools are dropped from the surface entirely — capability, not a hint
+/// in the prompt, is what keeps the default run report-free.
+pub fn surface(cfg: &Config) -> Vec<&'static str> {
+    let all: Vec<&'static str> = registry().iter().map(|t| t.name).collect();
+    if cfg.viz.auto_html {
+        all
+    } else {
+        all.into_iter().filter(|n| !REPORT_TOOLS.contains(n)).collect()
+    }
+}
+
+/// OpenAI / DeepSeek compatible tool declaration payload for the tools a
+/// configuration enables.
+pub fn openai_tools_for_config(cfg: &Config) -> Value {
+    openai_tools_for(&surface(cfg))
 }
 
 /// The same payload restricted to a subset of the registry, used for the
@@ -283,10 +298,11 @@ pub fn openai_tools_for(names: &[&str]) -> Value {
     )
 }
 
-/// Human-readable tool list for `ves tools`.
-pub fn describe() -> Vec<(&'static str, &'static str, Vec<String>)> {
+/// Same list, restricted to the tools a given config / surface enables.
+pub fn describe_for(names: &[&'static str]) -> Vec<(&'static str, &'static str, Vec<String>)> {
     registry()
         .iter()
+        .filter(|t| names.contains(&t.name))
         .map(|t| {
             let required: Vec<String> = t
                 .parameters
@@ -390,14 +406,36 @@ mod tests {
     }
 
     #[test]
+    fn the_report_tools_are_opt_in() {
+        // The registry holds all six; the *surface* is what the model sees, and by
+        // default that is the three research tools only.
+        let mut cfg = Config::default();
+        assert_eq!(surface(&cfg), vec!["web_search", "curl_tool", "scripts_tool"]);
+        assert_eq!(openai_tools_for_config(&cfg).as_array().unwrap().len(), 3);
+        assert_eq!(describe_for(&surface(&cfg)).len(), 3);
+
+        cfg.viz.auto_html = true;
+        assert_eq!(surface(&cfg).len(), 6);
+        assert_eq!(openai_tools_for_config(&cfg).as_array().unwrap().len(), 6);
+        assert_eq!(describe_for(&surface(&cfg)).len(), 6);
+    }
+
+    #[test]
     fn every_tool_has_a_valid_schema() {
         for spec in registry() {
             assert_eq!(spec.parameters.get("type").and_then(|t| t.as_str()), Some("object"));
             assert!(spec.parameters.get("properties").is_some(), "{} has no properties", spec.name);
             assert!(spec.description.len() > 40, "{} description too thin", spec.name);
         }
-        let payload = openai_tools();
-        assert_eq!(payload.as_array().unwrap().len(), 6);
+        let payload = openai_tools_for_config(&Config::default());
+        assert_eq!(payload.as_array().unwrap().len(), 3, "default surface is research-only");
+        let mut report_cfg = Config::default();
+        report_cfg.viz.auto_html = true;
+        assert_eq!(
+            openai_tools_for_config(&report_cfg).as_array().unwrap().len(),
+            6,
+            "the report tools come back with viz.auto_html"
+        );
     }
 
     #[test]

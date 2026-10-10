@@ -136,6 +136,11 @@ pub struct Viz {
     pub open_after_create: bool,
     /// Language used in the generated HTML chrome.
     pub locale: String,
+    /// Write an HTML report as part of every run (default **false**: the answer goes
+    /// to the terminal as Markdown, and the three report tools are not offered to the
+    /// model at all). Turn it on to get the offline artifact back, per run with
+    /// `--html` or permanently via `viz.auto_html: true`.
+    pub auto_html: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -288,6 +293,7 @@ impl Default for Viz {
             keep_model: true,
             open_after_create: false,
             locale: "zh".into(),
+            auto_html: false,
         }
     }
 }
@@ -535,6 +541,7 @@ pub fn redacted_summary(cfg: &Config) -> BTreeMap<String, String> {
     m.insert("curl.engine".into(), cfg.curl.engine.clone());
     m.insert("scripts.python".into(), cfg.scripts.python.clone());
     m.insert("viz.dir".into(), cfg.viz_dir().display().to_string());
+    m.insert("viz.auto_html".into(), cfg.viz.auto_html.to_string());
     m.insert("agent.max_steps".into(), cfg.agent.max_steps.to_string());
     m.insert("agent.style".into(), cfg.agent.style.clone());
     m.insert("agent.language".into(), cfg.agent.language.clone());

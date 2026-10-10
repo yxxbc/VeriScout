@@ -42,25 +42,31 @@ OPTIONS
       --save             fetch: save the raw body under raw/
       --render           fetch: render a JS-heavy page via the AnySearch extractor
       --theme <t>        create_html: dark|light
+      --html             also write the offline HTML report (default: off)
+      --no-html          force the report off even when viz.auto_html is true
       --json             machine-readable output
   -v, --verbose          also print the full closing answer and every tool result
-                         (default: tool-call lines + the clickable report link only)
-  -q, --quiet            suppress the progress trace: print only the report link
+  -q, --quiet            suppress the progress trace: print only the answer/report link
       --no-color         disable ANSI colours
   -V, --version          print version
   -h, --help             print this help
 
 NOTES
-  The agent has exactly six tools and no shell/file/system access. Ask it for a
-  fact and it will search, fetch the primary source, cross-check, then write an
-  offline HTML report into visualizations/.
+  By default the agent answers in the terminal: it searches, opens the primary
+  sources and cross-checks, then prints a Markdown answer (headings, lists, links,
+  code blocks) rendered for the terminal — nothing is written to disk. Add --html
+  (or set "viz.auto_html": true) to also get the offline report in visualizations/;
+  the three report tools are only offered to the model in that mode, so a default
+  run cannot surprise you with files.
 
-  The report is the deliverable: the closing answer, every tool call, the
-  fetched/blocked URLs and the caveats are all written into it, so the terminal
-  only prints the tool-call trace plus a clickable file:// link (OSC 8 — Cmd or
-  Ctrl+click to open; honoured unless NO_COLOR is set, FORCE_HYPERLINK=0/1 overrides).
-  The model's closing prose is NOT echoed here: read it in report §1, or pass -v
-  to print it. A run that produced no report still prints it (nowhere else to read it).
+  The agent has no shell, no file access and no system tools: the tool list is the
+  surface, and by default that surface is three tools — web_search, curl_tool,
+  scripts_tool.
+
+  Colours follow the terminal (NO_COLOR=1 / --no-color disable them). OSC 8
+  hyperlinks are used for links and report paths where the terminal supports them
+  (FORCE_HYPERLINK=0/1 overrides). `-v` prints the full closing answer and every
+  tool result.
 "#);
 
 #[derive(Debug, Default)]
@@ -192,6 +198,14 @@ fn build_config(cli: &Cli) -> Result<Config> {
     if let Some(n) = cli.flags.get("limit").and_then(|v| v.parse::<usize>().ok()) {
         cfg.search.results_per_engine = n;
     }
+    // The report is opt-in: `--html` turns it on for one run, `--no-html` overrides a
+    // config that enabled it. Default comes from `viz.auto_html` (false).
+    if cli.switches.contains("html") {
+        cfg.viz.auto_html = true;
+    }
+    if cli.switches.contains("no-html") {
+        cfg.viz.auto_html = false;
+    }
     Ok(cfg)
 }
 
@@ -213,7 +227,7 @@ pub fn main(argv: Vec<String>) -> i32 {
             Ok(())
         }
         "config" => cmd_config(&cli),
-        "tools" => cmd_tools(&cli),
+        "tools" => cmd_tools(&cli, None),
         "call" => cmd_call(&cli),
         "search" => cmd_search(&cli),
         "fetch" => cmd_fetch(&cli),
@@ -243,7 +257,19 @@ fn cmd_run(cli: &Cli) -> Result<()> {
     let mut agent = Agent::new(cfg, trace, cli.color)?;
     agent.set_verbose(cli.verbose);
     if !cli.quiet {
-        eprintln!("{}", paint(cli.color, "2", &format!("ves {} · model {}", VERSION, agent.model_line())));
+        eprintln!(
+            "{}",
+            paint(
+                cli.color,
+                "2",
+                &format!(
+                    "ves {} · model {} · 报告 {}",
+                    VERSION,
+                    agent.model_line(),
+                    if agent.auto_html() { "on（写入 visualizations/）" } else { "off（--html 打开）" }
+                )
+            )
+        );
     }
     let outcome = agent.run(&query)?;
     let finalized = close_reports(&mut agent, &outcome);
@@ -299,18 +325,18 @@ fn print_outcome(
         return Ok(());
     }
 
-    // The answer belongs to the artifact: `finalize` already wrote it into the
-    // report, so the terminal does not echo it. Only `-v` (the user asked for the
-    // full transcript) or a run that produced no report at all prints it here.
+    // The answer is the default deliverable now: it is printed here, rendered as
+    // Markdown. A run that also produced a report still prints nothing extra — the
+    // answer went into report §1 — unless `-v` asked for the full text.
     let has_report = !finalized.is_empty();
-    if !has_report && !cli.quiet {
+    if !has_report && !cli.quiet && agent.auto_html() {
         eprintln!(
             "{}",
-            paint(cli.color, "33", "⚠ 本次没有生成可视化报告：结论直接打印，完整轨迹加 -v")
+            paint(cli.color, "33", "⚠ 开了报告但这次没生成：结论直接打印，完整轨迹加 -v")
         );
     }
     if let Some(answer) = answer_for_terminal(&outcome.answer, cli.verbose, has_report) {
-        println!("{answer}");
+        println!("{}", crate::md::render(answer, cli.color));
     }
 
     if has_report {
@@ -354,9 +380,10 @@ fn print_outcome(
     Ok(())
 }
 
-/// The terminal is an index card, not the dossier. A run that produced a report
-/// hands the closing answer to it (§1 结论) and stays silent here; `-v` prints the
-/// full text, and a report-less run must print it — it is the only deliverable.
+/// The terminal is an index card, not the dossier. A report run hands the closing
+/// answer to the artifact (§1 结论) and stays silent here; `-v` prints the full text.
+/// Everything else — the default report-free run, and any run whose report failed —
+/// prints it, because it is the only deliverable there is.
 fn answer_for_terminal(answer: &str, verbose: bool, has_report: bool) -> Option<&str> {
     let answer = answer.trim();
     if answer.is_empty() {
@@ -428,14 +455,31 @@ fn print_json(value: &Value) {
     }
 }
 
-fn cmd_tools(cli: &Cli) -> Result<()> {
+fn cmd_tools(cli: &Cli, auto_html: Option<bool>) -> Result<()> {
+    let mut cfg = build_config(cli)?;
+    if let Some(on) = auto_html {
+        cfg.viz.auto_html = on;
+    }
+    let surface = tools::surface(&cfg);
     if cli.json {
-        print_json(&tools::openai_tools());
+        print_json(&tools::openai_tools_for_config(&cfg));
         return Ok(());
     }
-    println!("{}", paint(cli.color, "1", "VeriScout 工具面（仅此 6 个，无 shell / 无文件读写 / 无通用执行）"));
+    let mode = if cfg.viz.auto_html {
+        "含报告工具"
+    } else {
+        "默认不含报告工具 · 加 --html 或设 viz.auto_html=true 打开"
+    };
+    println!(
+        "{}",
+        paint(
+            cli.color,
+            "1",
+            &format!("VeriScout 工具面：{} 个 · {} · 无 shell / 无文件读写 / 无通用执行", surface.len(), mode)
+        )
+    );
     println!();
-    for (name, desc, required) in tools::describe() {
+    for (name, desc, required) in tools::describe_for(&surface) {
         println!("{}", paint(cli.color, "1;36", &format!("● {name}")));
         println!("  {}", first_sentence(desc));
         if !required.is_empty() {
@@ -722,8 +766,19 @@ fn cmd_repl(cli: &Cli) -> Result<()> {
     let mut agent = Agent::new(cfg, true, cli.color)?;
     agent.set_verbose(cli.verbose);
     if !cli.quiet {
-        println!("{}", paint(cli.color, "1;36", &format!("VeriScout (ves {}) — 检索 · 溯源 · 可视化", VERSION)));
-        println!("{}", paint(cli.color, "2", &format!("model: {}", agent.model_line())));
+        println!("{}", paint(cli.color, "1;36", &format!("VeriScout (ves {}) — 检索 · 溯源 · 出结论", VERSION)));
+        println!(
+            "{}",
+            paint(
+                cli.color,
+                "2",
+                &format!(
+                    "model: {} · 报告 {}",
+                    agent.model_line(),
+                    if agent.auto_html() { "on（写入 visualizations/）" } else { "off（/html on 打开）" }
+                )
+            )
+        );
         println!("{}", paint(cli.color, "2", "输入问题开始研究；/help 查看命令，/exit 退出。"));
         println!();
     }
@@ -751,13 +806,27 @@ fn cmd_repl(cli: &Cli) -> Result<()> {
                     agent.reset();
                     println!("{}", paint(cli.color, "2", "已重置会话上下文。"));
                 }
-                "tools" => cmd_tools(cli)?,
+                "tools" => cmd_tools(cli, Some(agent.auto_html()))?,
                 "config" => cmd_config(cli)?,
                 "viz" => {
                     for name in html_tools::list_reports(&agent.ctx) {
                         println!("  {}", name);
                     }
                 }
+                "html" => match arg.as_str() {
+                    "on" | "1" | "true" | "yes" => {
+                        agent.set_auto_html(true);
+                        println!("  html = on（每轮都会生成报告到 visualizations/）");
+                    }
+                    "off" | "0" | "false" | "no" => {
+                        agent.set_auto_html(false);
+                        println!("  html = off（只在终端回答）");
+                    }
+                    _ => println!(
+                        "  html = {}（用法：/html on|off）",
+                        if agent.auto_html() { "on" } else { "off" }
+                    ),
+                },
                 "steps" => match arg.parse::<u32>() {
                     Ok(n) => {
                         agent.set_max_steps(n);
@@ -800,6 +869,7 @@ fn print_repl_help(color: bool) {
     println!("{}", paint(color, "1", "命令："));
     println!("  /new            清空对话上下文");
     println!("  /tools          查看可用工具");
+    println!("  /html on|off    是否生成 HTML 报告（默认 off：只在终端回答）");
     println!("  /viz            列出已生成的报告");
     println!("  /steps <n>      设置最大步数");
     println!("  /trace on|full|off  精简轨迹 / 完整轨迹 / 关闭轨迹");
@@ -839,6 +909,36 @@ mod tests {
         assert_eq!(parse(args(&["--help"])).unwrap().command, "help");
         assert_eq!(parse(args(&["-V"])).unwrap().command, "version");
         assert_eq!(parse(args(&["-h"])).unwrap().command, "help");
+    }
+
+    #[test]
+    fn html_flags_toggle_the_report_surface() {
+        // The default lives in the config, so assert it on the struct itself and test
+        // the *flag override* here — that keeps this test independent of any
+        // ./.ves/config.json or ~/.ves/config.json on the machine running it.
+        assert!(!Config::default().viz.auto_html, "the HTML report must be opt-in by default");
+        assert_eq!(tools::surface(&Config::default()).len(), 3, "default surface is research-only");
+
+        let on = build_config(&parse(args(&["--html", "问题"])).unwrap()).unwrap();
+        assert!(on.viz.auto_html);
+        assert_eq!(tools::surface(&on).len(), 6);
+
+        let off = build_config(&parse(args(&["--html", "--no-html", "问题"])).unwrap()).unwrap();
+        assert!(!off.viz.auto_html, "--no-html must win over --html");
+
+        // a flag must not steal the question
+        let run = parse(args(&["--html", "北京", "天气"])).unwrap();
+        assert_eq!(run.command, "run");
+        assert_eq!(run.positional.join(" "), "北京 天气");
+        assert!(run.switches.contains("html"));
+    }
+
+    #[test]
+    fn the_answer_is_rendered_as_markdown() {
+        let rendered = crate::md::render("## 结论\n\n- 要点一\n- 要点二", false);
+        assert!(rendered.contains("结论"), "{rendered:?}");
+        assert!(!rendered.contains("##"), "ATX markers must not reach the terminal: {rendered:?}");
+        assert!(rendered.contains("要点一"));
     }
 
     #[test]

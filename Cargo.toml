@@ -1,6 +1,6 @@
 [package]
 name = "ves"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 description = "VeriScout (ves) - a Rust web-search / source-verification / visualization agent with a sealed tool surface"
@@ -22,6 +22,7 @@ regex = "1"
 url = "2"
 ureq = { version = "2.12", features = ["json", "tls"] }
 encoding_rs = "0.8"
+termimad = "0.35.5"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

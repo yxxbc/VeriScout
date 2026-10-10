@@ -10,6 +10,7 @@ mod html;
 mod http;
 mod llm;
 mod mcp;
+mod md;
 mod proc;
 mod search;
 mod tools;
