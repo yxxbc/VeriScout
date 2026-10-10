@@ -93,36 +93,25 @@ jobs:
             esac
           fi
 
-      - name: package
+      - name: package (unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          tag="${{ needs.meta.outputs.tag }}"
-          target="${{ matrix.target }}"
-          name="ves-${tag}-${target}"
-          bin="target/${target}/release/ves"
-          if [ "${RUNNER_OS}" = "Windows" ]; then bin="${bin}.exe"; fi
+          name="ves-${{ needs.meta.outputs.tag }}-${{ matrix.target }}"
+          archive="dist/${name}.tar.gz"
+          want="${name}/ves"
 
           mkdir -p "dist/${name}"
-          cp "$bin" "dist/${name}/"
+          cp "target/${{ matrix.target }}/release/ves" "dist/${name}/"
           cp README.md LICENSE CHANGELOG.md "dist/${name}/"
-
-          if [ "${RUNNER_OS}" = "Windows" ]; then
-            archive="dist/${name}.zip"
-            want="${name}/ves.exe"
-            (cd dist && 7z a -tzip "${name}.zip" "${name}" > /dev/null)
-            7z l -ba "$archive" | awk '{print $NF}' | tr -d '\r' > "$RUNNER_TEMP/listing.txt"
-          else
-            archive="dist/${name}.tar.gz"
-            want="${name}/ves"
-            tar -czf "$archive" -C dist "${name}"
-            tar -tzf "$archive" > "$RUNNER_TEMP/listing.txt"
-          fi
+          tar -czf "$archive" -C dist "${name}"
           rm -rf "dist/${name}"
 
-          # The archive root has to be the package folder: install.sh and install.ps1
-          # look for <name>/ves(.exe) there. Listing goes to a file first because
-          # `tar | grep -q` dies of SIGPIPE when the step runs under `pipefail`.
+          # The archive root has to be the package folder: install.sh looks for
+          # <name>/ves there. The listing goes to a file first because `tar | grep -q`
+          # dies of SIGPIPE when the step runs under `pipefail`.
+          tar -tzf "$archive" > "$RUNNER_TEMP/listing.txt"
           if ! grep -qx "$want" "$RUNNER_TEMP/listing.txt"; then
             echo "::error::$archive does not contain $want"
             cat "$RUNNER_TEMP/listing.txt"
@@ -130,6 +119,33 @@ jobs:
           fi
           echo "✓ $(wc -l < "$RUNNER_TEMP/listing.txt") entries, binary at $want"
           ls -lh dist
+
+      # PowerShell builds the zip and reads it back with the same .NET code that
+      # install.ps1 uses to expand it, so the layout is verified as users will see it.
+      - name: package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "ves-${{ needs.meta.outputs.tag }}-${{ matrix.target }}"
+          $want = "$name/ves.exe"
+
+          New-Item -ItemType Directory -Path "dist/$name" -Force | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/ves.exe" "dist/$name/"
+          Copy-Item README.md, LICENSE, CHANGELOG.md "dist/$name/"
+          Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip" -Force
+          Remove-Item -Recurse -Force "dist/$name"
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path "dist/$name.zip"))
+          $entries = $zip.Entries | ForEach-Object { $_.FullName }
+          $zip.Dispose()
+          if ($entries -notcontains $want) {
+            Write-Host "::error::$name.zip does not contain $want"
+            $entries | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+          Write-Host "OK: $($entries.Count) entries, binary at $want"
+          Get-ChildItem dist | Select-Object Name, Length
 
       - uses: actions/upload-artifact@v5
         with:
