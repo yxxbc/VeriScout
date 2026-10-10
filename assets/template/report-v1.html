@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{THEME}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<meta name="generator" content="VeriScout (ves)">
+<meta name="ves-report" content="{{REPORT_NAME}}">
+<style>
+  :root {
+    --bg: #0b0f14;
+    --bg-soft: #0f151d;
+    --panel: #121a24;
+    --panel-2: #16202c;
+    --border: #223040;
+    --border-soft: #1a2532;
+    --text: #e6edf3;
+    --text-dim: #9fb0c0;
+    --text-mute: #6e8091;
+    --accent: #4ea1ff;
+    --accent-soft: rgba(78,161,255,.14);
+    --verified: #34d399;
+    --supported: #67c7f5;
+    --unverified: #f0b429;
+    --disputed: #fb923c;
+    --refuted: #f87171;
+    --shadow: 0 10px 30px rgba(0,0,0,.35);
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  html[data-theme="light"] {
+    --bg: #f6f8fb;
+    --bg-soft: #eef2f7;
+    --panel: #ffffff;
+    --panel-2: #f7f9fc;
+    --border: #d8e0ea;
+    --border-soft: #e6ecf3;
+    --text: #14202c;
+    --text-dim: #4a5b6c;
+    --text-mute: #6d7f90;
+    --accent: #1668d6;
+    --accent-soft: rgba(22,104,214,.10);
+    --shadow: 0 8px 24px rgba(20,32,44,.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 15px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+  header.top {
+    position: sticky; top: 0; z-index: 40;
+    backdrop-filter: saturate(140%) blur(10px);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .top-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; gap: 16px; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: .2px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .brand small { color: var(--text-mute); font-weight: 400; font-family: var(--mono); font-size: 11px; }
+  .spacer { flex: 1; }
+  button.ghost {
+    background: var(--panel); color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 9px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  button.ghost:hover { color: var(--text); border-color: var(--accent); }
+  .hero { padding: 40px 0 8px; }
+  h1 { font-size: 30px; line-height: 1.25; margin: 0 0 10px; letter-spacing: -.4px; }
+  .query { color: var(--text-dim); font-size: 15px; margin: 0 0 6px; }
+  .query code { font-family: var(--mono); background: var(--panel); border: 1px solid var(--border-soft); padding: 2px 7px; border-radius: 6px; }
+  .meta { color: var(--text-mute); font-size: 12.5px; font-family: var(--mono); }
+  section { margin-top: 40px; }
+  h2 { font-size: 18px; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  h2 .count { font-family: var(--mono); font-size: 12px; color: var(--text-mute); border: 1px solid var(--border); border-radius: 20px; padding: 1px 9px; }
+  .hint { color: var(--text-mute); font-size: 13px; margin: 0 0 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px; }
+  .stat { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 14px 16px; }
+  .stat .k { color: var(--text-mute); font-size: 11.5px; text-transform: uppercase; letter-spacing: .7px; }
+  .stat .v { font-size: 24px; font-weight: 650; margin-top: 2px; }
+  .stat .s { color: var(--text-mute); font-size: 11.5px; font-family: var(--mono); }
+  .summary { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); }
+  .summary p { margin: 0 0 12px; }
+  .summary p:last-child { margin-bottom: 0; }
+  .grid { display: grid; gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border-soft); border-left: 3px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px; transition: border-color .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--border); }
+  .card.s-verified { border-left-color: var(--verified); }
+  .card.s-supported { border-left-color: var(--supported); }
+  .card.s-unverified { border-left-color: var(--unverified); }
+  .card.s-disputed { border-left-color: var(--disputed); }
+  .card.s-refuted { border-left-color: var(--refuted); }
+  .card-head { display: flex; gap: 12px; align-items: flex-start; }
+  .card-title { font-weight: 600; font-size: 15.5px; margin: 0; flex: 1; }
+  .pill {
+    font-size: 11px; padding: 2px 9px; border-radius: 20px; white-space: nowrap;
+    border: 1px solid currentColor; font-family: var(--mono); letter-spacing: .3px;
+  }
+  .p-verified { color: var(--verified); } .p-supported { color: var(--supported); }
+  .p-unverified { color: var(--unverified); } .p-disputed { color: var(--disputed); }
+  .p-refuted { color: var(--refuted); }
+  .card-detail { color: var(--text-dim); font-size: 14px; margin: 8px 0 0; }
+  .card-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .chip {
+    font-size: 11.5px; font-family: var(--mono); color: var(--text-dim);
+    background: var(--bg-soft); border: 1px solid var(--border-soft); border-radius: 7px; padding: 2px 8px;
+  }
+  .chip.link:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+  .tag { font-size: 11px; color: var(--text-mute); }
+  .conf { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-mute); font-family: var(--mono); }
+  .bar { width: 74px; height: 5px; border-radius: 3px; background: var(--bg-soft); overflow: hidden; border: 1px solid var(--border-soft); }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar.rel > i { background: linear-gradient(90deg, var(--accent), var(--verified)); }
+  #graph-wrap { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; position: relative; }
+  #graph { display: block; width: 100%; height: 520px; cursor: grab; }
+  #graph.dragging { cursor: grabbing; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 16px; border-top: 1px solid var(--border-soft); font-size: 12px; color: var(--text-dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 18px; height: 2px; border-radius: 2px; display: inline-block; }
+  .l-causes { background: var(--disputed); } .l-supports { background: var(--verified); }
+  .l-contradicts { background: var(--refuted); } .l-follows { background: var(--accent); }
+  .l-related { background: var(--text-mute); } .l-mentions { background: var(--supported); }
+  #graph-tip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 11px; font-size: 12.5px; max-width: 320px; box-shadow: var(--shadow); z-index: 5;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  th { color: var(--text-mute); font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+  tbody tr:hover { background: var(--bg-soft); }
+  td.url { font-family: var(--mono); font-size: 12px; color: var(--text-mute); word-break: break-all; max-width: 320px; }
+  .tbl-wrap { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: auto; }
+  details { margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--text-dim); font-size: 12.5px; }
+  blockquote {
+    margin: 10px 0 0; padding: 10px 14px; border-left: 2px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 8px 8px 0; color: var(--text-dim);
+    font-size: 13.5px; white-space: pre-wrap;
+  }
+  .timeline { position: relative; padding-left: 22px; }
+  .timeline:before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 1px; background: var(--border); }
+  .tl-item { position: relative; padding: 0 0 18px; }
+  .tl-item:before {
+    content: ""; position: absolute; left: -20px; top: 8px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--panel); border: 2px solid var(--accent);
+  }
+  .tl-date { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .tl-label { font-weight: 600; }
+  .tl-desc { color: var(--text-dim); font-size: 13.5px; }
+  .notes { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 16px 20px; }
+  .notes ul { margin: 6px 0 0; padding-left: 20px; color: var(--text-dim); }
+  footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border-soft); color: var(--text-mute); font-size: 12px; }
+  footer code { font-family: var(--mono); }
+  .warn { color: var(--disputed); }
+  @media (max-width: 720px) {
+    .wrap { padding: 0 16px 60px; }
+    h1 { font-size: 23px; }
+    #graph { height: 420px; }
+  }
+  @media print {
+    header.top { position: static; }
+    .card, .tbl-wrap, .summary, .notes { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="dot"></span> VeriScout <small>verified research report</small></div>
+    <div class="spacer"></div>
+    <button class="ghost" id="theme-toggle" type="button">切换主题</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <h1>{{TITLE}}</h1>
+    <p class="query">研究问题：<code>{{QUERY}}</code></p>
+    <div class="meta">{{META}}</div>
+  </div>
+
+  <div class="stats">{{STATS}}</div>
+
+  <section>
+    <h2>结论摘要 <span class="count">executive summary</span></h2>
+    <div class="summary">{{SUMMARY}}</div>
+  </section>
+
+  <section>
+    <h2>事件关联图 <span class="count">correlation graph</span></h2>
+    <p class="hint">节点为事件/主张/行为者，连线表示因果、支持、矛盾或时间先后关系。拖拽节点可重新布局，悬停查看详情，点击节点高亮其关联。</p>
+    <div id="graph-wrap">
+      <svg id="graph" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="graph-tip"></div>
+      <div class="legend">
+        <span><i class="l-causes"></i>导致 causes</span>
+        <span><i class="l-supports"></i>支持 supports</span>
+        <span><i class="l-contradicts"></i>矛盾 contradicts</span>
+        <span><i class="l-follows"></i>先后 follows</span>
+        <span><i class="l-related"></i>相关 related</span>
+        <span><i class="l-mentions"></i>提及 mentions</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>核查主张 <span class="count">{{ITEM_COUNT}} claims</span></h2>
+    <p class="hint">每条主张标注核查状态与置信度，并链接到支撑它的来源。</p>
+    <div class="grid">{{FINDINGS}}</div>
+  </section>
+
+  <section>
+    <h2>时间线 <span class="count">{{EVENT_COUNT}} events</span></h2>
+    <div class="timeline">{{TIMELINE}}</div>
+  </section>
+
+  <section>
+    <h2>来源清单 <span class="count">{{SOURCE_COUNT}} sources</span></h2>
+    <p class="hint">所有来源均为检索/抓取得到的真实链接，可靠性为启发式先验分（0-100），不是事实判断。</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:44px">#</th>
+            <th>来源</th>
+            <th style="width:150px">类型</th>
+            <th style="width:150px">可靠性</th>
+            <th style="width:110px">时间</th>
+          </tr>
+        </thead>
+        <tbody>{{SOURCES}}</tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>局限与说明 <span class="count">caveats</span></h2>
+    <div class="notes">{{NOTES}}</div>
+  </section>
+
+  <footer>{{PROVENANCE}}</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var GRAPH = {{GRAPH_DATA}};
+  var svg = document.getElementById("graph");
+  var tip = document.getElementById("graph-tip");
+  var NS = "http://www.w3.org/2000/svg";
+  var W = 1000, H = 520;
+
+  var KIND_COLOR = {{KIND_COLORS}};
+  var EDGE_COLOR = {
+    causes: "var(--disputed)", supports: "var(--verified)", contradicts: "var(--refuted)",
+    follows: "var(--accent)", related: "var(--text-mute)", mentions: "var(--supported)"
+  };
+  var EDGE_DASH = { contradicts: "5 4", related: "3 4" };
+
+  function el(name, attrs) {
+    var node = document.createElementNS(NS, name);
+    for (var k in attrs) { if (Object.prototype.hasOwnProperty.call(attrs, k)) { node.setAttribute(k, attrs[k]); } }
+    return node;
+  }
+
+  var nodes = GRAPH.nodes.map(function (n, i) {
+    var angle = (i / Math.max(1, GRAPH.nodes.length)) * Math.PI * 2;
+    return {
+      id: n.id, label: n.label, kind: n.kind || "event", date: n.date || "",
+      desc: n.description || "", sources: n.sources || [],
+      x: W / 2 + Math.cos(angle) * 210, y: H / 2 + Math.sin(angle) * 150,
+      vx: 0, vy: 0, fixed: false, r: n.kind === "actor" ? 13 : 10
+    };
+  });
+  var byId = {};
+  nodes.forEach(function (n) { byId[n.id] = n; });
+
+  var links = GRAPH.links.filter(function (l) { return byId[l.source] && byId[l.target]; }).map(function (l) {
+    return { source: byId[l.source], target: byId[l.target], kind: l.kind || "related", note: l.note || "", strength: l.strength || 2 };
+  });
+
+  // ---- layout --------------------------------------------------------
+  function simulate(ticks) {
+    var i, j, a, b, dx, dy, d, f;
+    for (var t = 0; t < ticks; t++) {
+      for (i = 0; i < nodes.length; i++) {
+        a = nodes[i];
+        if (a.fixed) { continue; }
+        for (j = i + 1; j < nodes.length; j++) {
+          b = nodes[j];
+          dx = b.x - a.x; dy = b.y - a.y;
+          d = Math.sqrt(dx * dx + dy * dy) || 1;
+          f = 5200 / (d * d);
+          a.vx -= (dx / d) * f; a.vy -= (dy / d) * f;
+          b.vx += (dx / d) * f; b.vy += (dy / d) * f;
+        }
+        a.vx += (W / 2 - a.x) * 0.0035;
+        a.vy += (H / 2 - a.y) * 0.0055;
+      }
+      for (i = 0; i < links.length; i++) {
+        a = links[i].source; b = links[i].target;
+        dx = b.x - a.x; dy = b.y - a.y;
+        d = Math.sqrt(dx * dx + dy * dy) || 1;
+        f = (d - 150) * 0.012 * (1 + links[i].strength * 0.12);
+        a.vx += (dx / d) * f; a.vy += (dy / d) * f;
+        b.vx -= (dx / d) * f; b.vy -= (dy / d) * f;
+      }
+      for (i = 0; i < nodes.length; i++) {
+        a = nodes[i];
+        if (a.fixed) { continue; }
+        a.vx *= 0.82; a.vy *= 0.82;
+        a.x += a.vx; a.y += a.vy;
+        a.x = Math.max(60, Math.min(W - 60, a.x));
+        a.y = Math.max(40, Math.min(H - 40, a.y));
+      }
+    }
+  }
+
+  var edgeLayer = el("g", {});
+  var nodeLayer = el("g", {});
+  var labelLayer = el("g", {});
+  svg.appendChild(edgeLayer); svg.appendChild(nodeLayer); svg.appendChild(labelLayer);
+
+  var edgeEls = [], nodeEls = [], labelEls = [];
+
+  function draw() {
+    edgeLayer.textContent = ""; nodeLayer.textContent = ""; labelLayer.textContent = "";
+    edgeEls = []; nodeEls = []; labelEls = [];
+    links.forEach(function (l) {
+      var line = el("line", {
+        x1: l.source.x, y1: l.source.y, x2: l.target.x, y2: l.target.y,
+        stroke: EDGE_COLOR[l.kind] || "var(--text-mute)", "stroke-width": 1 + l.strength * 0.35,
+        "stroke-linecap": "round"
+      });
+      if (EDGE_DASH[l.kind]) { line.setAttribute("stroke-dasharray", EDGE_DASH[l.kind]); }
+      edgeLayer.appendChild(line);
+      edgeEls.push({ el: line, link: l });
+    });
+    nodes.forEach(function (n) {
+      var g = el("g", { style: "cursor:pointer" });
+      var circle = el("circle", {
+        cx: n.x, cy: n.y, r: n.r, fill: KIND_COLOR[n.kind] || "var(--accent)",
+        stroke: "var(--panel)", "stroke-width": 2
+      });
+      g.appendChild(circle);
+      nodeLayer.appendChild(g);
+      var text = el("text", {
+        x: n.x, y: n.y + n.r + 14, "text-anchor": "middle", fill: "var(--text-dim)",
+        "font-size": "11.5", "font-family": "var(--sans)"
+      });
+      text.textContent = n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label;
+      labelLayer.appendChild(text);
+      nodeEls.push({ el: g, node: n });
+      labelEls.push({ el: text, node: n });
+    });
+  }
+
+  function refresh() {
+    edgeEls.forEach(function (e) {
+      e.el.setAttribute("x1", e.link.source.x); e.el.setAttribute("y1", e.link.source.y);
+      e.el.setAttribute("x2", e.link.target.x); e.el.setAttribute("y2", e.link.target.y);
+    });
+    nodeEls.forEach(function (n) {
+      n.el.firstChild.setAttribute("cx", n.node.x);
+      n.el.firstChild.setAttribute("cy", n.node.y);
+    });
+    labelEls.forEach(function (l) {
+      l.el.setAttribute("x", l.node.x); l.el.setAttribute("y", l.node.y + l.node.r + 14);
+    });
+  }
+
+  function highlight(n) {
+    var neighbours = {};
+    links.forEach(function (l) {
+      if (l.source === n) { neighbours[l.target.id] = true; }
+      if (l.target === n) { neighbours[l.source.id] = true; }
+    });
+    nodeEls.forEach(function (item) {
+      var on = item.node === n || neighbours[item.node.id];
+      item.el.setAttribute("opacity", on ? 1 : 0.22);
+    });
+    labelEls.forEach(function (item) {
+      var on = item.node === n || neighbours[item.node.id];
+      item.el.setAttribute("opacity", on ? 1 : 0.22);
+    });
+    edgeEls.forEach(function (item) {
+      var on = item.link.source === n || item.link.target === n;
+      item.el.setAttribute("opacity", on ? 1 : 0.1);
+    });
+  }
+
+  function clearHighlight() {
+    nodeEls.forEach(function (i) { i.el.setAttribute("opacity", 1); });
+    labelEls.forEach(function (i) { i.el.setAttribute("opacity", 1); });
+    edgeEls.forEach(function (i) { i.el.setAttribute("opacity", 1); });
+  }
+
+  function showTip(node, evt) {
+    if (!tip) { return; }
+    var rect = svg.getBoundingClientRect();
+    tip.innerHTML = "<strong>" + escapeHtml(node.label) + "</strong>" +
+      (node.date ? "<div style='color:var(--accent);font-family:var(--mono);font-size:11.5px'>" + escapeHtml(node.date) + "</div>" : "") +
+      (node.desc ? "<div style='margin-top:4px;color:var(--text-dim)'>" + escapeHtml(node.desc) + "</div>" : "") +
+      (node.sources && node.sources.length ? "<div style='margin-top:6px;color:var(--text-mute);font-size:11.5px'>来源：" + node.sources.map(escapeHtml).join(", ") + "</div>" : "");
+    tip.style.opacity = "1";
+    var x = (evt.clientX - rect.left) + 14;
+    var y = (evt.clientY - rect.top) + 14;
+    tip.style.left = Math.min(x, rect.width - 320) + "px";
+    tip.style.top = y + "px";
+  }
+
+  function hideTip() { if (tip) { tip.style.opacity = "0"; } }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ---- interaction ---------------------------------------------------
+  var drag = null;
+  function toSvg(evt) {
+    var rect = svg.getBoundingClientRect();
+    return { x: (evt.clientX - rect.left) / rect.width * W, y: (evt.clientY - rect.top) / rect.height * H };
+  }
+  svg.addEventListener("pointerdown", function (evt) {
+    var p = toSvg(evt);
+    var hit = null, best = 26;
+    nodes.forEach(function (n) {
+      var d = Math.sqrt((n.x - p.x) * (n.x - p.x) + (n.y - p.y) * (n.y - p.y));
+      if (d < Math.max(best, n.r + 10)) { best = d; hit = n; }
+    });
+    if (hit) {
+      drag = hit; hit.fixed = true; svg.classList.add("dragging");
+      highlight(hit); showTip(hit, evt);
+      svg.setPointerCapture && svg.setPointerCapture(evt.pointerId);
+    }
+  });
+  svg.addEventListener("pointermove", function (evt) {
+    if (drag) {
+      var p = toSvg(evt);
+      drag.x = p.x; drag.y = p.y;
+      simulate(3); refresh(); showTip(drag, evt);
+    }
+  });
+  svg.addEventListener("pointerup", function () {
+    if (drag) { drag.fixed = false; drag = null; svg.classList.remove("dragging"); }
+  });
+  svg.addEventListener("pointerleave", function () { hideTip(); });
+
+  simulate(260);
+  draw();
+  setInterval(function () { if (!drag) { simulate(1); refresh(); } }, 90);
+
+  // ---- theme ---------------------------------------------------------
+  var root = document.documentElement;
+  var btn = document.getElementById("theme-toggle");
+  try {
+    var saved = localStorage.getItem("ves-theme");
+    if (saved) { root.setAttribute("data-theme", saved); }
+  } catch (e) { /* offline file:// may block storage */ }
+  if (btn) {
+    btn.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("ves-theme", next); } catch (e) {}
+    });
+  }
+})();
+</script>
+</body>
+</html>

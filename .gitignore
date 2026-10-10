@@ -1,0 +1,11 @@
+# sibling tool directories (unrelated to this project)
+/gitee-*/
+# build artifacts
+/target
+/.cache
+# runtime artifacts created by ves itself
+/visualizations/
+/raw/
+/.ves/local.toml
+*.ves.log
+.DS_Store

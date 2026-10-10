@@ -1,0 +1,198 @@
+name: Release
+
+# Push a tag (v0.1.0) to build every platform and publish a GitHub Release.
+# Manual runs build the tag that matches Cargo.toml's version.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  meta:
+    name: resolve tag
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE:-branch}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="v$(awk -F'"' '/^version/ {print $2; exit}' Cargo.toml)"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "building release $tag"
+
+  build:
+    name: ${{ matrix.target }}
+    needs: meta
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04,     target: x86_64-unknown-linux-musl }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-musl }
+          - { os: macos-14,         target: x86_64-apple-darwin }
+          - { os: macos-14,         target: aarch64-apple-darwin }
+          - { os: windows-2022,     target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # Static musl builds: rustls pulls in ring (C code), so give the C compiler
+      # and the linker a musl wrapper for the target triple.
+      - name: musl toolchain
+        if: contains(matrix.target, 'musl')
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          triple_upper=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
+          {
+            echo "CC_${{ matrix.target }}=musl-gcc"
+            echo "CARGO_TARGET_${triple_upper}_LINKER=musl-gcc"
+          } >> "$GITHUB_ENV"
+
+      - name: build
+        shell: bash
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="target/${{ matrix.target }}/release/ves"
+          if [ "${RUNNER_OS}" = "Windows" ]; then bin="${bin}.exe"; fi
+          "$bin" --version
+          "$bin" tools --json > /dev/null
+
+      - name: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.meta.outputs.tag }}"
+          target="${{ matrix.target }}"
+          name="ves-${tag}-${target}"
+          bin="target/${target}/release/ves"
+          if [ "${RUNNER_OS}" = "Windows" ]; then bin="${bin}.exe"; fi
+
+          mkdir -p "dist/${name}"
+          cp "$bin" "dist/${name}/"
+          cp README.md LICENSE CHANGELOG.md "dist/${name}/"
+
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            7z a -tzip "dist/${name}.zip" "dist/${name}" > /dev/null
+          else
+            tar -czf "dist/${name}.tar.gz" -C dist "${name}"
+          fi
+          rm -rf "dist/${name}"
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ves-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    needs: [meta, build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum ves-*.tar.gz ves-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.meta.outputs.tag }}"
+          cat > NOTES.md <<'EOF'
+          ## 安装
+
+          **macOS / Linux（一行脚本）**
+
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | sh
+          ```
+
+          **Windows（PowerShell）**
+
+          ```powershell
+          irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
+          ```
+
+          也可以直接从下面的 Assets 手动下载（每个包里有 `README.md`、`LICENSE`、`CHANGELOG.md`）：
+
+          | 平台 | 文件 |
+          | --- | --- |
+          | Linux x86_64（静态，Alpine 可用） | `ves-__TAG__-x86_64-unknown-linux-musl.tar.gz` |
+          | Linux arm64（静态） | `ves-__TAG__-aarch64-unknown-linux-musl.tar.gz` |
+          | macOS Apple Silicon | `ves-__TAG__-aarch64-apple-darwin.tar.gz` |
+          | macOS Intel | `ves-__TAG__-x86_64-apple-darwin.tar.gz` |
+          | Windows x64 | `ves-__TAG__-x86_64-pc-windows-msvc.zip` |
+
+          校验下载：
+
+          ```bash
+          sha256sum -c SHA256SUMS.txt
+          ```
+
+          ## 首次使用
+
+          ```bash
+          ves config init            # 生成配置，填入 api_key（或设 DEEPSEEK_API_KEY）
+          ves "一次性纸杯到底能不能回收"
+          ```
+
+          完整变更见 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)。
+          EOF
+          sed -i "s/__TAG__/${tag}/g" NOTES.md
+          head -14 NOTES.md
+
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.meta.outputs.tag }}"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* \
+              --title "VeriScout $tag" \
+              --notes-file NOTES.md \
+              --target "$GITHUB_SHA"
+          fi
+          gh release view "$tag" --json tagName,assets --jq '.tagName, (.assets[].name)'

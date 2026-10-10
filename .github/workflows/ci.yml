@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Full test suite on the platforms the Python sandbox is built for.
+  test:
+    name: test · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: test
+        run: cargo test --locked
+
+      - name: build (release)
+        run: cargo build --release --locked
+
+      - name: smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin=target/release/ves
+          "$bin" --version
+          "$bin" tools --json | head -c 80
+          echo
+
+  # Windows gets compiled + smoke tested, but not the sandbox tests: proc.rs
+  # spawns /bin/sh and the scripts sandbox expects POSIX rlimits, so that part
+  # of the suite is macOS/Linux only.
+  windows-build:
+    name: build · windows-2022
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: check
+        run: cargo check --all-targets --locked
+
+      - name: build (release)
+        run: cargo build --release --locked
+
+      - name: smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/ves.exe --version
+          target/release/ves.exe tools --json | head -c 80
+          echo
