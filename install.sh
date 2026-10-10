@@ -49,18 +49,38 @@ done
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-fetch_stdout() {
-    if have curl; then curl -fsSL --retry 2 --connect-timeout 20 "$1"
-    elif have wget; then wget -qO- "$1"
-    else echo "this script needs curl or wget" >&2; exit 1
-    fi
-}
-
 fetch_file() {
     if have curl; then curl -fsSL --retry 2 --connect-timeout 20 -o "$2" "$1"
     elif have wget; then wget -qO "$2" "$1"
     else echo "this script needs curl or wget" >&2; exit 1
     fi
+}
+
+# The GitHub API answers 403 to anonymous callers without a User-Agent header (and
+# shares one small quota per IP), so anything API-shaped goes through here.
+fetch_stdout_api() {
+    if have curl; then
+        curl -fsSL --retry 2 --connect-timeout 20 \
+            -H 'User-Agent: ves-installer' -H 'Accept: application/vnd.github+json' "$1"
+    elif have wget; then
+        wget -qO- --header='User-Agent: ves-installer' --header='Accept: application/vnd.github+json' "$1"
+    else echo "this script needs curl or wget" >&2; exit 1
+    fi
+}
+
+# Latest release tag. `https://github.com/<repo>/releases/latest` redirects to
+# `/releases/tag/<tag>` for everyone, so read that first: no auth, no quota. The API
+# stays as a fallback for setups where the redirect cannot be read.
+latest_tag() {
+    if have curl; then
+        effective=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+            "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)
+        case "$effective" in
+            */releases/tag/*) printf '%s\n' "${effective##*/releases/tag/}"; return 0 ;;
+        esac
+    fi
+    fetch_stdout_api "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
+        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
 }
 
 # ---- platform -------------------------------------------------------------
@@ -80,12 +100,11 @@ TARGET="${TARGET_OVERRIDE:-${arch}-${os_part}}"
 
 # ---- resolve the release --------------------------------------------------
 if [ "$VERSION" = "latest" ]; then
-    echo "→ 查询最新版本（$REPO）"
-    VERSION=$(fetch_stdout "https://api.github.com/repos/${REPO}/releases/latest" \
-        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+    echo "→ 查询最新版本（${REPO}）"
+    VERSION=$(latest_tag)
     if [ -z "$VERSION" ]; then
-        echo "could not find a release for $REPO (no release yet, or the GitHub API rate-limited us)" >&2
-        echo "hint: install a specific tag with: sh install.sh -v v0.1.0" >&2
+        echo "could not find a release for $REPO" >&2
+        echo "hint: install a specific tag with: sh install.sh -v v0.1.1" >&2
         exit 1
     fi
 fi
@@ -101,7 +120,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 echo "→ 下载 ${ASSET}"
 if ! fetch_file "${BASE_URL}/${ASSET}" "${WORK}/${ASSET}"; then
     echo "download failed: ${BASE_URL}/${ASSET}" >&2
-    echo "check the platform you asked for, or pick a tag: sh install.sh -v v0.1.0" >&2
+    echo "check the platform you asked for, or pick a tag: sh install.sh -v v0.1.1" >&2
     exit 1
 fi
 
@@ -187,7 +206,8 @@ cat <<'EOF'
 
   ves config init          # 生成配置，填入 api_key（或设 DEEPSEEK_API_KEY）
   ves "一次性纸杯到底能不能回收"
+  ves --html "一次性纸杯到底能不能回收"   # 想要一份离线 HTML 报告再加这个
   ves --help               # 全部命令
 
-报告会写到当前目录的 visualizations/，双击即可离线打开。
+默认只在终端把结论说清楚，不写任何文件；加了 --html 才会生成报告到 visualizations/。
 EOF
